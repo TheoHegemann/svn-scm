@@ -8,7 +8,7 @@ import {
   window
 } from "vscode";
 import { Model, ModelChangeEvent, OriginalResourceChangeEvent } from "./model";
-import { toSvnUri, fromSvnUri, SvnUriAction } from "./uri";
+import { toSvnUri, fromSvnUri, SvnUriAction } from "./helpers/uri";
 import { throttle, debounce } from "./decorators";
 import {
   filterEvent,

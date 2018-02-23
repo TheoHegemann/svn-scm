@@ -50,6 +50,6 @@ class ConflictItem implements QuickPickItem {
   }
 }
 
-export function getConflictPickOptions() {
+export function getConflictPicks() {
   return ConflictOptions.map(option => new ConflictItem(option));
 }

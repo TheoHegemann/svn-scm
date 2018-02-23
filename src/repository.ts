@@ -30,7 +30,7 @@ import {
 import * as path from "path";
 import * as micromatch from "micromatch";
 import { setInterval, clearInterval } from "timers";
-import { toSvnUri, SvnUriAction } from "./uri";
+import { toSvnUri, SvnUriAction } from "./helpers/uri";
 import { Status, PropStatus, SvnErrorCodes } from "./svn";
 import { IFileStatus } from "./statusParser";
 import { configuration } from "./helpers/configuration";
@@ -537,7 +537,7 @@ export class Repository {
         }
       }
     }
-
+    
     return undefined;
   }
 
@@ -676,6 +676,14 @@ export class Repository {
     if (!/^<{7}[^]+^={7}[^]+^>{7}/m.test(text)) {
       commands.executeCommand("svn.resolved", conflict.resourceUri);
     }
+  }
+  
+  async propset(propName: string, args: any[]) {
+    return this.repository.propset(propName, args);
+  }
+  
+  async ignore(directory: string, filename:string) {
+    return this.repository.ignore(directory, filename);
   }
 
   private async run<T>(

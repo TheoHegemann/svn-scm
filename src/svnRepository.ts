@@ -364,4 +364,23 @@ export class Repository {
 
     return 0;
   }
+  
+  async propset(propName: string, args: any[]) {
+    return await this.exec(['propset', `svn:${propName}`, ...args]);
+  }
+  
+  async ignore(directory: string, filename: string) {
+    let result;
+    let ignore
+    try {
+       result = await this.svn.exec(directory, ['propget', 'svn:ignore', directory]);
+       ignore = result.stdout;
+       ignore = ignore + filename + "\n";
+       ignore = ignore.trim();
+    } catch (error) {
+      return;
+    }
+    
+    return await this.svn.exec(directory, ['propset', 'svn:ignore', ignore, '.']);
+  }
 }

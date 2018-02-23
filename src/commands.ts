@@ -22,11 +22,11 @@ import { Svn, Status, SvnErrorCodes } from "./svn";
 import { Model } from "./model";
 import { Repository } from "./repository";
 import { Resource } from "./resource";
-import { toSvnUri, fromSvnUri, SvnUriAction } from "./uri";
+import { toSvnUri, fromSvnUri, SvnUriAction } from "./helpers/uri";
 import * as fs from "fs";
 import * as path from "path";
 import { start } from "repl";
-import { getConflictPickOptions } from "./conflictItems";
+import { getConflictPicks } from "./pickList/conflictPickList";
 import { applyLineChanges } from "./lineChanges";
 import { IDisposable, hasSupportToRegisterDiffCommand } from "./util";
 import {
@@ -36,7 +36,9 @@ import {
   getCommitChangelistPickOptions,
   inputCommitChangelist
 } from "./changelistItems";
-import { configuration } from './helpers/configuration';
+import { configuration } from "./helpers/configuration";
+import { getPropertyPicks } from "./pickList/propertyPickList";
+import { revertChanges } from './helpers/revertChanges';
 
 interface CommandOptions {
   repository?: boolean;
@@ -859,7 +861,7 @@ export class SvnCommands implements IDisposable {
       const placeHolder = `Select conflict option for ${
         conflict.resourceUri.path
       }`;
-      const picks = getConflictPickOptions();
+      const picks = getConflictPicks();
 
       const choice = await window.showQuickPick(picks, { placeHolder });
 
@@ -888,7 +890,7 @@ export class SvnCommands implements IDisposable {
     if (selection.length === 0) {
       return;
     }
-    const picks = getConflictPickOptions();
+    const picks = getConflictPicks();
 
     const choice = await window.showQuickPick(picks, {
       placeHolder: "Select conflict option"
@@ -963,46 +965,50 @@ export class SvnCommands implements IDisposable {
     }
   }
 
-  private async _revertChanges(
-    textEditor: TextEditor,
-    changes: LineChange[]
-  ): Promise<void> {
-    const modifiedDocument = textEditor.document;
-    const modifiedUri = modifiedDocument.uri;
+  @command("svn.propset")
+  async propset(arg?: Resource | Uri) {
+    let resource: Resource | undefined = undefined;
 
-    if (modifiedUri.scheme !== "file") {
+    if (arg instanceof Resource) {
+      resource = arg;
+    } else if (arg instanceof Uri) {
+      resource = this.getSCMResource(arg);
+    } else {
+      resource = this.getSCMResource();
+    }
+
+    if (!resource) {
       return;
     }
 
-    const originalUri = toSvnUri(modifiedUri, SvnUriAction.SHOW, {
-      ref: "BASE"
+    const picks = getPropertyPicks();
+
+    const choice = await window.showQuickPick(picks, {
+      placeHolder: "Select conflict option"
     });
-    const originalDocument = await workspace.openTextDocument(originalUri);
-    const basename = path.basename(modifiedUri.fsPath);
-    const message = `Are you sure you want to revert the selected changes in ${basename}?`;
-    const yes = "Revert Changes";
-    const pick = await window.showWarningMessage(message, { modal: true }, yes);
 
-    if (pick !== yes) {
+    if (!choice) {
       return;
     }
+    
+    const repository = this.model.getRepository(resource.resourceUri.fsPath);
 
-    const result = applyLineChanges(
-      originalDocument,
-      modifiedDocument,
-      changes
-    );
-    const edit = new WorkspaceEdit();
-    edit.replace(
-      modifiedUri,
-      new Range(
-        new Position(0, 0),
-        modifiedDocument.lineAt(modifiedDocument.lineCount - 1).range.end
-      ),
-      result
-    );
-    workspace.applyEdit(edit);
-    await modifiedDocument.save();
+    
+    
+    if (!repository) {
+      return;
+    }
+    
+    try {
+      const result = await choice.run(repository, resource.resourceUri.fsPath);
+      
+      if (result) {
+        window.showInformationMessage(result.stdout); 
+      }
+    } catch (error) {
+      console.error(error.stderr);
+      window.showErrorMessage(error.stderr);
+    }
   }
 
   @command("svn.revertChange")
@@ -1019,7 +1025,7 @@ export class SvnCommands implements IDisposable {
       return;
     }
 
-    await this._revertChanges(textEditor, [
+    await revertChanges(textEditor, [
       ...changes.slice(0, index),
       ...changes.slice(index + 1)
     ]);
@@ -1064,10 +1070,10 @@ export class SvnCommands implements IDisposable {
       return;
     }
 
-    await this._revertChanges(textEditor, selectedChanges);
+    await revertChanges(textEditor, selectedChanges);
   }
 
-  @command('svn.close', {repository: true})
+  @command("svn.close", { repository: true })
   async close(repository: Repository): Promise<void> {
     this.model.close(repository);
   }
