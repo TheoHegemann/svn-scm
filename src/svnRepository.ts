@@ -364,23 +364,27 @@ export class Repository {
 
     return 0;
   }
-  
+
   async propset(propName: string, args: any[]) {
-    return await this.exec(['propset', `svn:${propName}`, ...args]);
+    return await this.exec(["propset", `svn:${propName}`, ...args]);
   }
-  
+
   async ignore(directory: string, filename: string) {
-    let result;
-    let ignore
+    let ignore: string = await this.getCurrentIgnore(directory);
+    ignore = ignore + filename + "\n";
+    ignore = ignore.trim();
+
+    return await this.exec(["propset", "svn:ignore", ignore, directory]);
+  }
+
+  private async getCurrentIgnore(directory: string): Promise<string> {
+    let ignore: string = "";
+
     try {
-       result = await this.svn.exec(directory, ['propget', 'svn:ignore', directory]);
-       ignore = result.stdout;
-       ignore = ignore + filename + "\n";
-       ignore = ignore.trim();
-    } catch (error) {
-      return;
-    }
-    
-    return await this.svn.exec(directory, ['propset', 'svn:ignore', ignore, '.']);
+      let result = await this.exec(["propget", "svn:ignore", directory]);
+      ignore = result.stdout;
+    } catch (error) {}
+
+    return ignore;
   }
 }
